@@ -1,0 +1,17 @@
+CONFIG = {
+    'rooms': {},
+    'db.user': 'gossipr',
+    'db.pass': '',    
+    'db.name': 'gossipr',
+    'db.driver': 'MySQLdb',
+    'db.host': 'localhost',
+    'db.debug': False,
+    'xmpp.host': 'localhost',
+    'xmpp.password': 'secret',
+    'xmpp.port': 5524,
+    'xmpp.muc.host': 'conference.localhost',
+    'xmpp.gossipr.host': 'gossipr.localhost',
+    'xmpp.gossipr.resource': 'gossipr',
+    'web.port': 8080,
+    'interfaces': ['web', 'xmpp']
+    }
