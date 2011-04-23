@@ -1,7 +1,7 @@
 import time
 import datetime
 from twisted.words.protocols.jabber import jid, xmlstream
-from twisted.words.protocols.jabber.xmlstream import IQ
+import twisted.words.protocols.jabber.xmlstream
 from twisted.application import internet, service
 from twisted.internet import interfaces, defer, reactor
 from twisted.python import log
@@ -12,7 +12,7 @@ from twisted.words.protocols.jabber import component
 
 from zope.interface import Interface, implements
 
-#from campfirer.models import Room, Message
+from campfirer.ns import *
 
 class LogService(component.Service):
     def transportConnected(self, xmlstream):
@@ -32,32 +32,61 @@ class MUCService(component.Service):
     def __init__(self, config):
         self.config = config
         self.rooms = {}
-        self.jid = "listener@%s/%s" % (self.config['xmpp.gossipr.host'], self.config['xmpp.gossipr.resource'])
+        self.host = self.config['xmpp.muc.host']
 
 
-    def iq(self, type='get'):
-        r = IQ(self.xmlstream, type)
-        r['from'] = self.jid
+    def iq(self, type='get', id=None):
+        r = xmlstream.IQ(self.xmlstream, type)
+        r['from'] = self.host
+        if id is not None:
+            r['id'] = id
         return r
-
-
-    def presence(self, sendto):
-        p = domish.Element((None, 'presence'))
-        p['to'] = sendto
-        p['from'] = self.jid
-        return p
         
 
     def componentConnected(self, xmlstream):
         self.jabberId = xmlstream.authenticator.otherHost
         self.xmlstream = xmlstream
-        self.xmlstream.addObserver("/message", self.onMessage, 1)
-
-        iq = self.iq()
-        iq.addElement('query', 'http://jabber.org/protocol/disco#items')
-        iq.send(self.config['xmpp.muc.host']).addCallback(self.updateRoomList)
+        self.xmlstream.addObserver(DISCO_INFO, self.onDiscoInfo)
+        self.xmlstream.addObserver(PRESENCE, self.onPresence)
 
 
+    def onDiscoInfo(self, iq):
+        response = self.iq('result', iq['id'])
+        query = getattr(iq, 'query', None)
+        if query is not None:
+            query = response.addElement('query', DISCO_NS_INFO)
+            identity = domish.Element((None, 'identity'), attribs={'category': "conference", 'name': 'campfirenow.com interface MUC', 'type': "text"})
+            query.addChild(identity)
+            query.addChild(domish.Element((None, 'feature'), attribs={'var': NS_MUC}))
+            response.send(iq['from'])
+
+
+    # <presence from='bmuller@butterfat.net/hm-min' to='testthree@muc.campfirer.com/bmuller'>
+    #   <x xmlns='http://jabber.org/protocol/muc'><password>password</password></x></presence>
+    def onPresence(self, pres):
+        to = jid.JID(pres['to'])
+        room = to.user
+        
+        if getattr(pres, 'type', "") == "unavailable":
+            # kill room now
+            pass
+        else:
+            p = domish.Element((None, 'presence'))
+            p['from'] = "%s@%s/coolguy" % (room, self.host)
+            p['to'] = pres['from']
+            x = p.addElement('x', NS_MUC_USER)
+            x.addChild(domish.Element((None, 'item'), attribs = {'affiliation': 'member', 'role': 'participant'}))
+            self.xmlstream.send(p)
+
+
+    ##################    ##################    ##################    ##################    ##################
+    def presence(self, sendto):
+        p = domish.Element((None, 'presence'))
+        p['to'] = sendto
+        p['from'] = self.jid
+        return p
+
+    
     def updateRoomList(self, roomlist):
         rooms = []
         for room in roomlist.firstChildElement().elements():
