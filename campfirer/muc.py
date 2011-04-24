@@ -12,7 +12,7 @@ from twisted.words.protocols.jabber import component
 
 from zope.interface import Interface, implements
 
-from campfirer.ns import *
+from campfirer.xmpp import *
 
 class LogService(component.Service):
     def transportConnected(self, xmlstream):
@@ -64,13 +64,29 @@ class MUCService(component.Service):
     # <presence from='bmuller@butterfat.net/hm-min' to='testthree@muc.campfirer.com/bmuller'>
     #   <x xmlns='http://jabber.org/protocol/muc'><password>password</password></x></presence>
     def onPresence(self, pres):
-        to = jid.JID(pres['to'])
-        room = to.user
+
+        def handleAuth(campfire):
+            
         
+        to = jid.JID(pres['to'])
+        room_parts = to.user.split("-")
+        room = room_parts[1:].join("-")
+        account = room_parts[0]    
+
+        password = xpath.queryForString("/presence/x/password", pres)
         if getattr(pres, 'type', "") == "unavailable":
             # kill room now
             pass
+        elif password == "":
+            p = domish.Element((None, 'presence'))
+            p['from'] = to.userhost()
+            p['to'] = pres['from']
+            p.addElement('x', NS_MUC_USER)
+            p.addChild(Error("not-authorized"))
+            self.xmlstream.send(p)
         else:
+            Campfire(account).initialize(to.resource, password).addCallback(handleAuth)
+            
             p = domish.Element((None, 'presence'))
             p['from'] = "%s@%s/coolguy" % (room, self.host)
             p['to'] = pres['from']
