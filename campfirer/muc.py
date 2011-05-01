@@ -13,6 +13,7 @@ from twisted.words.protocols.jabber import component
 from zope.interface import Interface, implements
 
 from campfirer.xmpp import *
+from campfirer.campfire import *
 
 class LogService(component.Service):
     def transportConnected(self, xmlstream):
@@ -33,7 +34,8 @@ class MUCService(component.Service):
         self.config = config
         self.rooms = {}
         self.host = self.config['xmpp.muc.host']
-
+        self.smokey = SmokeyTheBear(self)
+        # every x seconds, tell smokey to check on the fires
 
     def iq(self, type='get', id=None):
         r = xmlstream.IQ(self.xmlstream, type)
@@ -48,7 +50,8 @@ class MUCService(component.Service):
         self.xmlstream = xmlstream
         self.xmlstream.addObserver(DISCO_INFO, self.onDiscoInfo)
         self.xmlstream.addObserver(PRESENCE, self.onPresence)
-
+        log.msg("muc component connected")
+        
 
     def onDiscoInfo(self, iq):
         response = self.iq('result', iq['id'])
@@ -63,36 +66,44 @@ class MUCService(component.Service):
 
     # <presence from='bmuller@butterfat.net/hm-min' to='testthree@muc.campfirer.com/bmuller'>
     #   <x xmlns='http://jabber.org/protocol/muc'><password>password</password></x></presence>
-    def onPresence(self, pres):
+    def onPresence(self, pres):      
+        to = jid.JID(pres['to'])
+        room_parts = to.user.split(".")
+        room = ".".join(room_parts[1:])
+        account = room_parts[0]    
 
         def handleAuth(campfire):
-            
-        
-        to = jid.JID(pres['to'])
-        room_parts = to.user.split("-")
-        room = room_parts[1:].join("-")
-        account = room_parts[0]    
+            if campfire is None:
+                self.sendErrorPresence(pres, "not-allowed", "cancel", NS_MUC)
+            self.initializeRoom(campfire)
 
         password = xpath.queryForString("/presence/x/password", pres)
         if getattr(pres, 'type', "") == "unavailable":
-            # kill room now
-            pass
+            self.smokey.putCampfireOut(account, to.resource)
         elif password == "":
-            p = domish.Element((None, 'presence'))
-            p['from'] = to.userhost()
-            p['to'] = pres['from']
-            p.addElement('x', NS_MUC_USER)
-            p.addChild(Error("not-authorized"))
-            self.xmlstream.send(p)
+            self.sendErrorPresence(pres, "not-authorized")
         else:
-            Campfire(account).initialize(to.resource, password).addCallback(handleAuth)
-            
-            p = domish.Element((None, 'presence'))
-            p['from'] = "%s@%s/coolguy" % (room, self.host)
-            p['to'] = pres['from']
-            x = p.addElement('x', NS_MUC_USER)
-            x.addChild(domish.Element((None, 'item'), attribs = {'affiliation': 'member', 'role': 'participant'}))
-            self.xmlstream.send(p)
+            log.msg("attempting to auth %s for room %s on account %s" % (to.resource, room, account))
+            self.smokey.getCampfire(account, to.resource, password).addCallback(handleAuth)
+
+
+    def initializeRoom(self, campfire):            
+        p = domish.Element((None, 'presence'))
+        p['from'] = "%s@%s/coolguy" % (room, self.host)
+        p['to'] = pres['from']
+        x = p.addElement('x', NS_MUC_USER)
+        x.addChild(domish.Element((None, 'item'), attribs = {'affiliation': 'member', 'role': 'participant'}))
+        self.xmlstream.send(p)
+
+
+    def sendErrorPresence(self, pres, reason, type="auth", ns=NS_MUC_USER):
+        to = jid.JID(pres['to'])        
+        p = domish.Element((None, 'presence'))
+        p['from'] = to.userhost()
+        p['to'] = pres['from']
+        p.addElement('x', ns)
+        p.addChild(Error(reason, type))
+        self.xmlstream.send(p)        
 
 
     ##################    ##################    ##################    ##################    ##################

@@ -1,0 +1,6 @@
+CONFIG = { 
+       'jid': "name@host/resource",
+       'password': "",
+       'room': "account.roomname@muc.campfirer.com/username",
+       'roompasswd': ""
+}

@@ -18,7 +18,10 @@ PRESENCE  = '/presence'
 
 
 class Error(Element):
-    TYPES = { 'not-authorized': "urn:ietf:params:xml:ns:xmpp-stanzas" }
+    TYPES = {
+        'not-authorized': "urn:ietf:params:xml:ns:xmpp-stanzas",
+        'not-allowed': "urn:ietf:params:xml:ns:xmpp-stanzas"
+        }
     
     def __init__(self, error, type="auth"):
         Element.__init__(self, (None, 'error'), attribs = {'type': type})

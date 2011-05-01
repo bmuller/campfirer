@@ -1,6 +1,7 @@
 import base64
 
 from twisted.internet.ssl import ClientContextFactory
+from twisted.python import log
 from twisted.web import client
 
 from campfirer.DOMLight import createModel
@@ -38,13 +39,14 @@ class CampfireClient:
 
     
     def getPage(self, url, username=None, password=None):
+        log.msg("fetching %s" % url)
         if username is None:
             username = self.token
         if password is None:
             password = "X"
         auth = "%s:%s" % (username, password)
         headers = {'Authorization': base64.b64encode(auth) }            
-        url = "https://%s.campfirenow.com/%s" % (self.account, url)
+        url = str("https://%s.campfirenow.com/%s" % (self.account, url))
         return client.getPage(url, self.contextFactory, headers=headers)    
 
 
@@ -80,15 +82,33 @@ class CampfireRoom(CampfireClient):
                 body = xmlmsg.body[0].text[0]                
                 msgs.append(Message(user, body, msgtype))
         self.msgs.append(msgs)
-        return self
         
 
     def update(self):
-        return self.getPage("room/%s.xml" % self.room_id).addCallback(self._updateRoom)
+        def _updateFinished():
+            args = (self.roomname, self.account, len(self.participants), len(self.msgs))
+            log.msg("%s.%s updated with %i participants and %i messages" % args)
+            return self
+        return self.getPage("room/%s.xml" % self.room_id).addCallback(self._updateRoom).addCallback(_updateFinished)
 
 
 class Campfire(CampfireClient):
+    """
+    A Campfire is a per-user per-account (x in x.campfirenow.com) connection
+    """
+    def __init__(self, account):
+        CampfireClient.__init__(self, account)
+        self.rooms = {}
+
+    
     def getRoom(self, name):
+        if self.rooms.has_key(name):
+            return defer.succeed(self.rooms[name])
+        
+        def _saveHandle(room):
+            self.rooms[name] = room
+            return room
+        
         def _getRoomID(response):
             root = createModel(response)
             room_id = None
@@ -97,13 +117,14 @@ class Campfire(CampfireClient):
                     room_id = str(xmlroom.id[0].text[0])
             if room_id is None:
                 return None
-            return CampfireRoom(self.account, self.token, name, room_id).update()
+            return CampfireRoom(self.account, self.token, name, room_id).update().addCallback(_saveHandle)
         return self.getPage("rooms.xml").addCallback(_getRoomID)
 
 
     def initialize(self, username, password):
         def _getTokenFailure(result):
             self.token = None
+            return None
             
         def _getToken(response):
             root = createModel(response)
@@ -111,3 +132,28 @@ class Campfire(CampfireClient):
             return self
         
         return self.getPage("users/me.xml", username, password).addCallback(_getToken, _getTokenFailure)
+
+
+class SmokeyTheBear:
+    def __init__(self, muc):
+        self.fires = {}
+        self.muc = muc
+
+    def key(self, account, user):
+        return "%s@%s" % (user, account)        
+
+    def getCampfire(self, account, user, password):
+        key = self.key(account, user)
+        if self.fires.has_key(key):
+            return self.succeed(self.fires[key])
+        def save(result):
+            if result is not None:
+                self.fires[key] = result
+            return result
+        return Campfire(account).initialize(user, password).addCallback(save)
+
+    def putCampfireOut(account, user):
+        key = self.key(account, user)
+        if self.fires.has_key(key):
+            del self.fires[key]
+            
