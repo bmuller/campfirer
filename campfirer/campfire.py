@@ -1,14 +1,9 @@
 import base64
 
-from twisted.internet.ssl import ClientContextFactory
 from twisted.python import log
 from twisted.web import client
 
 from campfirer.DOMLight import createModel
-
-class WebClientContextFactory(ClientContextFactory):
-    def getContext(self):
-        return ClientContextFactory.getContext(self)
 
 
 class Message:
@@ -34,7 +29,6 @@ class MessageList:
 class CampfireClient:
     def __init__(self, account):
         self.account = account
-        self.contextFactory = WebClientContextFactory()
         self.token = None
 
     
@@ -47,7 +41,7 @@ class CampfireClient:
         auth = "%s:%s" % (username, password)
         headers = {'Authorization': base64.b64encode(auth) }            
         url = str("https://%s.campfirenow.com/%s" % (self.account, url))
-        return client.getPage(url, self.contextFactory, headers=headers)    
+        return client.getPage(url, headers=headers)    
 
 
 class CampfireRoom(CampfireClient):
@@ -99,6 +93,7 @@ class Campfire(CampfireClient):
     def __init__(self, account):
         CampfireClient.__init__(self, account)
         self.rooms = {}
+        self.username = None
 
     
     def getRoom(self, name):
@@ -123,15 +118,18 @@ class Campfire(CampfireClient):
 
     def initialize(self, username, password):
         def _getTokenFailure(result):
+            log.err("Authentication for %s failed" % username)
             self.token = None
             return None
             
         def _getToken(response):
             root = createModel(response)
             self.token = root.children["api-auth-token"][0].text[0]
+            log.msg("Successfully authenticated %s with token %s" % (username, self.token))            
             return self
-        
-        return self.getPage("users/me.xml", username, password).addCallback(_getToken, _getTokenFailure)
+
+        self.username = username
+        return self.getPage("users/me.xml", username, password).addCallbacks(_getToken, _getTokenFailure)
 
 
 class SmokeyTheBear:
@@ -152,7 +150,8 @@ class SmokeyTheBear:
             return result
         return Campfire(account).initialize(user, password).addCallback(save)
 
-    def putCampfireOut(account, user):
+    def putCampfireOut(self, account, user):
+        log.msg("Putting campfire %s @ %s out" % (user, account))
         key = self.key(account, user)
         if self.fires.has_key(key):
             del self.fires[key]

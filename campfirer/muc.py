@@ -75,10 +75,11 @@ class MUCService(component.Service):
         def handleAuth(campfire):
             if campfire is None:
                 self.sendErrorPresence(pres, "not-allowed", "cancel", NS_MUC)
-            self.initializeRoom(campfire)
+            else:
+                self.initializeRoom(campfire, room, to, jid.JID(pres['from']))
 
         password = xpath.queryForString("/presence/x/password", pres)
-        if getattr(pres, 'type', "") == "unavailable":
+        if pres.getAttribute('type') == "unavailable":
             self.smokey.putCampfireOut(account, to.resource)
         elif password == "":
             self.sendErrorPresence(pres, "not-authorized")
@@ -87,10 +88,21 @@ class MUCService(component.Service):
             self.smokey.getCampfire(account, to.resource, password).addCallback(handleAuth)
 
 
-    def initializeRoom(self, campfire):            
-        p = domish.Element((None, 'presence'))
-        p['from'] = "%s@%s/coolguy" % (room, self.host)
-        p['to'] = pres['from']
+    def initializeRoom(self, campfire, room, to, jidfrom):
+        #HERE
+        log.msg("initializing room %s" % room) # for %s @ %s" % (room, campfire.user, campfire.account))
+        def initParticipants(room):
+            if room is None:
+                return
+            for username in room.participants.keys():
+                pfrom = "%s/%s" % (to.user, username)
+                pto = jidfrom
+                self.sendPresence(pfrom, pto)
+        campfire.getRoom(room).addCallback(initParticipants)
+
+
+    def sendPresence(self, pfrom, pto):
+        p = domish.Element((None, 'presence'), {'from': pfrom, 'to': pto})
         x = p.addElement('x', NS_MUC_USER)
         x.addChild(domish.Element((None, 'item'), attribs = {'affiliation': 'member', 'role': 'participant'}))
         self.xmlstream.send(p)
