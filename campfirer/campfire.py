@@ -23,7 +23,9 @@ class MessageList:
 
     def __iter__(self):
         return self.msgs.__iter__()
-                
+
+    def __len__(self):
+        return len(self.msgs)
         
 
 class CampfireClient:
@@ -68,7 +70,6 @@ class CampfireRoom(CampfireClient):
     def _updateMsgs(self, response):
         root = createModel(response)
         msgs = []
-        print response
         for xmlmsg in root.message:
             msgtype = xmlmsg.type[0].text[0]
             if msgtype in ["TextMessage", "PasteMessage"]:
@@ -76,10 +77,11 @@ class CampfireRoom(CampfireClient):
                 body = xmlmsg.body[0].text[0]                
                 msgs.append(Message(user, body, msgtype))
         self.msgs.append(msgs)
+        return self
         
 
     def update(self):
-        def _updateFinished():
+        def _updateFinished(self):
             args = (self.roomname, self.account, len(self.participants), len(self.msgs))
             log.msg("%s.%s updated with %i participants and %i messages" % args)
             return self
@@ -108,8 +110,10 @@ class Campfire(CampfireClient):
             root = createModel(response)
             room_id = None
             for xmlroom in root.room:
-                if str(xmlroom.name[0].text[0]) == name:
+                if str(xmlroom.name[0].text[0]).lower() == name.lower():
                     room_id = str(xmlroom.id[0].text[0])
+                    log.msg("found room %s for account %s with id %s" % (xmlroom.name[0].text[0], self.account, room_id))                    
+                    break
             if room_id is None:
                 return None
             return CampfireRoom(self.account, self.token, name, room_id).update().addCallback(_saveHandle)

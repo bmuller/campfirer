@@ -37,6 +37,7 @@ class MUCService(component.Service):
         self.smokey = SmokeyTheBear(self)
         # every x seconds, tell smokey to check on the fires
 
+
     def iq(self, type='get', id=None):
         r = xmlstream.IQ(self.xmlstream, type)
         r['from'] = self.host
@@ -89,7 +90,7 @@ class MUCService(component.Service):
 
 
     def initializeRoom(self, campfire, room, to, jidfrom):
-        #HERE
+        # HERE
         log.msg("initializing room %s" % room) # for %s @ %s" % (room, campfire.user, campfire.account))
         def initParticipants(room):
             if room is None:
