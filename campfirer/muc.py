@@ -89,20 +89,27 @@ class MUCService(component.Service):
             self.smokey.getCampfire(account, to.resource, password).addCallback(handleAuth)
 
 
-    def initializeRoom(self, campfire, room, to, jidfrom):
-        # HERE
-        log.msg("initializing room %s" % room) # for %s @ %s" % (room, campfire.user, campfire.account))
+    def initializeRoom(self, campfire, room, jidto, jidfrom):
+        log.msg("initializing room %s" % room)
         def initParticipants(room):
             if room is None:
                 return
+
             for username in room.participants.keys():
-                pfrom = "%s/%s" % (to.user, username)
-                pto = jidfrom
-                self.sendPresence(pfrom, pto)
+                mfrom = jidto.userhostJID()                
+                mfrom.resource = username
+                self.sendPresence(mfrom, jidfrom)
+                
+            for msg in room.msgs:
+                mfrom = jidto.userhostJID()                
+                mfrom.resource = msg.user            
+                self.sendMessage(mfrom, msg.body, jidfrom, msg.tstamp)
+                
         campfire.getRoom(room).addCallback(initParticipants)
 
 
     def sendPresence(self, pfrom, pto):
+        log.msg("sending presence from %s to %s" % pfrom, pto)
         p = domish.Element((None, 'presence'), {'from': pfrom, 'to': pto})
         x = p.addElement('x', NS_MUC_USER)
         x.addChild(domish.Element((None, 'item'), attribs = {'affiliation': 'member', 'role': 'participant'}))
@@ -116,7 +123,16 @@ class MUCService(component.Service):
         p['to'] = pres['from']
         p.addElement('x', ns)
         p.addChild(Error(reason, type))
-        self.xmlstream.send(p)        
+        self.xmlstream.send(p)
+
+
+    def sendMessage(self, mfrom, msgBody, mto, tstamp):
+        log.msg("sending message from %s to %s" % (mfrom, mto))
+        m = domish.Element((None, 'message'), attribs = {'from': mfrom.full(), 'to': mto.full(), 'type': 'groupchat'})
+        m.addElement('body', content=msgBody)
+        delay = domish.Element((DELAY_NS, 'delay'), attribs = {'from': mfrom.userhost(), 'stamp': tstamp})
+        m.addChild(delay)
+        self.xmlstream.send(m)
 
 
     ##################    ##################    ##################    ##################    ##################

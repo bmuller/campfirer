@@ -16,6 +16,7 @@ NS_MUC_USER     = NS_MUC + '#user'
 MESSAGE   = '/message'
 PRESENCE  = '/presence'
 
+DELAY_NS = 'urn:xmpp:delay'
 
 class Error(Element):
     TYPES = {

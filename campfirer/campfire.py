@@ -7,10 +7,11 @@ from campfirer.DOMLight import createModel
 
 
 class Message:
-    def __init__(self, user, body, msgtype):
+    def __init__(self, user, body, msgtype, tstamp):
         self.user = user
         self.body = body
         self.msgtype = msgtype
+        self.tstamp = tstamp
         
 
 class MessageList:
@@ -74,8 +75,9 @@ class CampfireRoom(CampfireClient):
             msgtype = xmlmsg.type[0].text[0]
             if msgtype in ["TextMessage", "PasteMessage"]:
                 user = self.participants.get(xmlmsg.children['user-id'][0].text[0], xmlmsg.children['user-id'][0].text[0])
-                body = xmlmsg.body[0].text[0]                
-                msgs.append(Message(user, body, msgtype))
+                body = xmlmsg.body[0].text[0]
+                tstamp = xmlmsg.children["created-at"][0].text[0]
+                msgs.append(Message(user, body, msgtype, tstamp))
         self.msgs.append(msgs)
         return self
         
