@@ -1,5 +1,6 @@
 import base64
 
+from twisted.internet import defer
 from twisted.python import log
 from twisted.web import client
 
@@ -34,18 +35,28 @@ class CampfireClient:
         self.account = account
         self.token = None
 
+
+    def url(self, path):
+        return str("https://%s.campfirenow.com/%s" % (self.account, path))
+    
     
     def getPage(self, url, username=None, password=None):
-        log.msg("fetching %s" % url)
+        log.msg("GET %s" % url)
         if username is None:
             username = self.token
         if password is None:
             password = "X"
         auth = "%s:%s" % (username, password)
         headers = {'Authorization': base64.b64encode(auth) }            
-        url = str("https://%s.campfirenow.com/%s" % (self.account, url))
-        return client.getPage(url, headers=headers)    
+        return client.getPage(self.url(url), headers=headers)    
 
+
+    def postPage(self, url):
+        log.msg("POST %s" % url)
+        auth = "%s:X" % self.token
+        headers = {'Authorization': base64.b64encode(auth) }
+        return client.getPage(self.url(url), method='POST', headers=headers)    
+    
 
 class CampfireRoom(CampfireClient):
     def __init__(self, account, token, roomname, room_id):
@@ -80,6 +91,14 @@ class CampfireRoom(CampfireClient):
                 msgs.append(Message(user, body, msgtype, tstamp))
         self.msgs.append(msgs)
         return self
+
+
+    def join(self):
+        return self.postPage("room/%s/join.xml" % self.room_id).addCallback(lambda self, _: self)
+
+
+    def leave(self):
+        return self.postPage("room/%s/leave.xml" % self.room_id).addCallback(lambda self, _: self)
         
 
     def update(self):
@@ -118,8 +137,13 @@ class Campfire(CampfireClient):
                     break
             if room_id is None:
                 return None
-            return CampfireRoom(self.account, self.token, name, room_id).update().addCallback(_saveHandle)
+            return CampfireRoom(self.account, self.token, name, room_id).join().update().addCallback(_saveHandle)
         return self.getPage("rooms.xml").addCallback(_getRoomID)
+
+
+    def leaveRooms(self):
+        ds = [room.leave() for room in self.rooms.values()]
+        return defer.DeferredList(ds)
 
 
     def initialize(self, username, password):
@@ -159,6 +183,9 @@ class SmokeyTheBear:
     def putCampfireOut(self, account, user):
         log.msg("Putting campfire %s @ %s out" % (user, account))
         key = self.key(account, user)
+        def deleteFire(result):
+            del self.fires[key]            
         if self.fires.has_key(key):
-            del self.fires[key]
+            self.fires[key].leaveRooms().addCallback(deleteFire)
+            
             
