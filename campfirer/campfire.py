@@ -94,11 +94,11 @@ class CampfireRoom(CampfireClient):
 
 
     def join(self):
-        return self.postPage("room/%s/join.xml" % self.room_id).addCallback(lambda self, _: self)
+        return self.postPage("room/%s/join.xml" % self.room_id).addCallback(lambda _: self)
 
 
     def leave(self):
-        return self.postPage("room/%s/leave.xml" % self.room_id).addCallback(lambda self, _: self)
+        return self.postPage("room/%s/leave.xml" % self.room_id).addCallback(lambda _: self)
         
 
     def update(self):
@@ -124,6 +124,7 @@ class Campfire(CampfireClient):
             return defer.succeed(self.rooms[name])
         
         def _saveHandle(room):
+            log.msg("saving room %s" % name)
             self.rooms[name] = room
             return room
         
@@ -137,12 +138,13 @@ class Campfire(CampfireClient):
                     break
             if room_id is None:
                 return None
-            return CampfireRoom(self.account, self.token, name, room_id).join().update().addCallback(_saveHandle)
+            return CampfireRoom(self.account, self.token, name, room_id).join().addCallback(lambda s: s.update).addCallback(_saveHandle)
         return self.getPage("rooms.xml").addCallback(_getRoomID)
 
 
     def leaveRooms(self):
         ds = [room.leave() for room in self.rooms.values()]
+        log.msg("%s@%s leaving all %i rooms" % (self.username, self.account, len(self.rooms)))
         return defer.DeferredList(ds)
 
 
