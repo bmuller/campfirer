@@ -2,5 +2,6 @@ CONFIG = {
     'xmpp.host': 'localhost',
     'xmpp.port': 5554,
     'xmpp.muc.password': 'secret',
-    'xmpp.muc.host': 'muc.localhost'
+    'xmpp.muc.host': 'muc.localhost',
+    'campfire.update.interval': 5
     }

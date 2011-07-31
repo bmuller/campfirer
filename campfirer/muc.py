@@ -35,7 +35,8 @@ class MUCService(component.Service):
         self.rooms = {}
         self.host = self.config['xmpp.muc.host']
         self.smokey = SmokeyTheBear(self)
-        # every x seconds, tell smokey to check on the fires
+        # every campfire.update.interval seconds, tell smokey to check on the fires
+        self.smokey.startFireDuty(self.config['campfire.update.interval'])
 
 
     def iq(self, type='get', id=None):
@@ -95,22 +96,22 @@ class MUCService(component.Service):
             if room is None:
                 return
 
-            for username in room.participants.keys():
-                mfrom = jidto.userhostJID()                
-                mfrom.resource = username
+            for username in room.participants.values():
+                mfrom = jidto.userhostJID()  
+                mfrom.resource = username.replace(" ", "")
                 self.sendPresence(mfrom, jidfrom)
                 
             for msg in room.msgs:
                 mfrom = jidto.userhostJID()                
-                mfrom.resource = msg.user            
+                mfrom.resource = msg.user.replace(" ", "") 
                 self.sendMessage(mfrom, msg.body, jidfrom, msg.tstamp)
                 
         campfire.getRoom(room).addCallback(initParticipants)
 
 
     def sendPresence(self, pfrom, pto):
-        log.msg("sending presence from %s to %s" % pfrom, pto)
-        p = domish.Element((None, 'presence'), {'from': pfrom, 'to': pto})
+        log.msg("sending presence from %s to %s" % (pfrom, pto))
+        p = domish.Element((None, 'presence'), attribs = {'from': pfrom.full(), 'to': pto.full()})
         x = p.addElement('x', NS_MUC_USER)
         x.addChild(domish.Element((None, 'item'), attribs = {'affiliation': 'member', 'role': 'participant'}))
         self.xmlstream.send(p)

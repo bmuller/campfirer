@@ -1,6 +1,6 @@
 import base64
 
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 from twisted.python import log
 from twisted.web import client
 
@@ -19,6 +19,7 @@ class MessageList:
     def __init__(self, maxsize=100):
         self.maxsize = maxsize
         self.msgs = []
+        self.last_msg_id = None
 
     def append(self, msgs):
         self.msgs = (self.msgs + msgs)[-self.maxsize:]
@@ -76,7 +77,11 @@ class CampfireRoom(CampfireClient):
             uid = xmluser.id[0].text[0]
             self.participants[uid] = xmluser.name[0].text[0]
         self.topic = root.topic[0].text[0]
-        return self.getPage("room/%s/recent.xml" % self.room_id).addCallback(self._updateMsgs)
+        if self.msgs.last_msg_id is not None:
+            url = "room/%s/recent.xml?since_message_id=%s" % (self.room_id, self.msgs.last_msg_id)
+        else:
+            url = "room/%s/recent.xml" % self.room_id
+        return self.getPage(url).addCallback(self._updateMsgs)
 
 
     def _updateMsgs(self, response):
@@ -89,6 +94,7 @@ class CampfireRoom(CampfireClient):
                 body = xmlmsg.body[0].text[0]
                 tstamp = xmlmsg.children["created-at"][0].text[0]
                 msgs.append(Message(user, body, msgtype, tstamp))
+            self.msgs.last_msg_id = xmlmsg.children['id'][0].text[0]
         self.msgs.append(msgs)
         return self
 
@@ -118,6 +124,12 @@ class Campfire(CampfireClient):
         self.rooms = {}
         self.username = None
 
+
+    def updateRooms(self):
+        log.msg("All rooms in %s being updated" % self.account)
+        for room in self.rooms.values():
+            room.update()
+
     
     def getRoom(self, name):
         if self.rooms.has_key(name):
@@ -138,7 +150,7 @@ class Campfire(CampfireClient):
                     break
             if room_id is None:
                 return None
-            return CampfireRoom(self.account, self.token, name, room_id).join().addCallback(lambda s: s.update).addCallback(_saveHandle)
+            return CampfireRoom(self.account, self.token, name, room_id).join().addCallback(lambda s: s.update()).addCallback(_saveHandle)
         return self.getPage("rooms.xml").addCallback(_getRoomID)
 
 
@@ -169,8 +181,16 @@ class SmokeyTheBear:
         self.fires = {}
         self.muc = muc
 
+
+    def checkFires(self):
+        log.msg("Smokey is checking all fires")
+        for fire in self.fires.values():
+            fire.updateRooms()
+
+
     def key(self, account, user):
         return "%s@%s" % (user, account)        
+
 
     def getCampfire(self, account, user, password):
         key = self.key(account, user)
@@ -182,6 +202,7 @@ class SmokeyTheBear:
             return result
         return Campfire(account).initialize(user, password).addCallback(save)
 
+
     def putCampfireOut(self, account, user):
         log.msg("Putting campfire %s @ %s out" % (user, account))
         key = self.key(account, user)
@@ -191,3 +212,7 @@ class SmokeyTheBear:
             self.fires[key].leaveRooms().addCallback(deleteFire)
             
             
+    def startFireDuty(self, seconds):
+        self.checkFires()
+        reactor.callLater(seconds, self.startFireDuty, seconds)
+
