@@ -60,7 +60,7 @@ class CampfireClient:
     
 
 class CampfireRoom(CampfireClient):
-    def __init__(self, account, token, roomname, room_id):
+    def __init__(self, account, token, roomname, room_id, muc):
         CampfireClient.__init__(self, account)
         self.roomname = roomname
         self.room_id = room_id
@@ -68,6 +68,16 @@ class CampfireRoom(CampfireClient):
         self.participants = {}
         self.topic = ""
         self.msgs = MessageList()
+        self.muc = muc
+        # the jid of the user who has connected
+        self.source_jid = None
+        # the jid of the use in the room
+        self.participant_jid = None
+
+
+    def setJIDs(self, source_jid, participant_jid):
+        self.source_jid = source_jid
+        self.participant_jid = participant_jid
 
 
     def _updateRoom(self, response):
@@ -108,10 +118,14 @@ class CampfireRoom(CampfireClient):
         
 
     def update(self):
+        # if we haven't finished setting up MUC side - don't do anything yet
+        if self.participant_jid == None:
+            return defer.succeed(self)
         def _updateFinished(self):
             args = (self.roomname, self.account, len(self.participants), len(self.msgs))
             log.msg("%s.%s updated with %i participants and %i messages" % args)
-            return self
+            self.muc.handleRoomUpdate(self)
+            return defer.succeed(self)
         return self.getPage("room/%s.xml" % self.room_id).addCallback(self._updateRoom).addCallback(_updateFinished)
 
 
@@ -119,10 +133,11 @@ class Campfire(CampfireClient):
     """
     A Campfire is a per-user per-account (x in x.campfirenow.com) connection
     """
-    def __init__(self, account):
+    def __init__(self, account, muc):
         CampfireClient.__init__(self, account)
         self.rooms = {}
         self.username = None
+        self.muc = muc
 
 
     def updateRooms(self):
@@ -150,7 +165,8 @@ class Campfire(CampfireClient):
                     break
             if room_id is None:
                 return None
-            return CampfireRoom(self.account, self.token, name, room_id).join().addCallback(lambda s: s.update()).addCallback(_saveHandle)
+            room = CampfireRoom(self.account, self.token, name, room_id, self.muc)
+            return room.join().addCallback(lambda s: s.update()).addCallback(_saveHandle)
         return self.getPage("rooms.xml").addCallback(_getRoomID)
 
 
@@ -195,12 +211,12 @@ class SmokeyTheBear:
     def getCampfire(self, account, user, password):
         key = self.key(account, user)
         if self.fires.has_key(key):
-            return self.succeed(self.fires[key])
+            return defer.succeed(self.fires[key])
         def save(result):
             if result is not None:
                 self.fires[key] = result
             return result
-        return Campfire(account).initialize(user, password).addCallback(save)
+        return Campfire(account, self.muc).initialize(user, password).addCallback(save)
 
 
     def putCampfireOut(self, account, user):

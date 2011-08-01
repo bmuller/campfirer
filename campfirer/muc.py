@@ -68,17 +68,17 @@ class MUCService(component.Service):
 
     # <presence from='bmuller@butterfat.net/hm-min' to='testthree@muc.campfirer.com/bmuller'>
     #   <x xmlns='http://jabber.org/protocol/muc'><password>password</password></x></presence>
-    def onPresence(self, pres):      
+    def onPresence(self, pres):
         to = jid.JID(pres['to'])
         room_parts = to.user.split(".")
-        room = ".".join(room_parts[1:])
+        roomname = ".".join(room_parts[1:])
         account = room_parts[0]    
 
         def handleAuth(campfire):
             if campfire is None:
                 self.sendErrorPresence(pres, "not-allowed", "cancel", NS_MUC)
             else:
-                self.initializeRoom(campfire, room, to, jid.JID(pres['from']))
+                self.initializeRoom(campfire, roomname, to, jid.JID(pres['from']))
 
         password = xpath.queryForString("/presence/x/password", pres)
         if pres.getAttribute('type') == "unavailable":
@@ -86,27 +86,30 @@ class MUCService(component.Service):
         elif password == "":
             self.sendErrorPresence(pres, "not-authorized")
         else:
-            log.msg("attempting to auth %s for room %s on account %s" % (to.resource, room, account))
+            log.msg("attempting to auth %s for room %s on account %s" % (to.resource, roomname, account))
             self.smokey.getCampfire(account, to.resource, password).addCallback(handleAuth)
 
-
-    def initializeRoom(self, campfire, room, jidto, jidfrom):
-        log.msg("initializing room %s" % room)
+    
+    def initializeRoom(self, campfire, roomname, participant_jid, source_jid):
+        log.msg("initializing room %s" % roomname)
         def initParticipants(room):
             if room is None:
                 return
+            room.setJIDs(source_jid, participant_jid)
+            return room.update()
+        campfire.getRoom(roomname).addCallback(initParticipants)
 
-            for username in room.participants.values():
-                mfrom = jidto.userhostJID()  
-                mfrom.resource = username.replace(" ", "")
-                self.sendPresence(mfrom, jidfrom)
+
+    def handleRoomUpdate(self, room):
+        for username in room.participants.values():
+            mfrom = room.participant_jid.userhostJID()  
+            mfrom.resource = username.replace(" ", "")
+            self.sendPresence(mfrom, room.source_jid)
                 
-            for msg in room.msgs:
-                mfrom = jidto.userhostJID()                
-                mfrom.resource = msg.user.replace(" ", "") 
-                self.sendMessage(mfrom, msg.body, jidfrom, msg.tstamp)
-                
-        campfire.getRoom(room).addCallback(initParticipants)
+        for msg in room.msgs:
+            mfrom = room.participant_jid.userhostJID()
+            mfrom.resource = msg.user.replace(" ", "") 
+            self.sendMessage(mfrom, msg.body, room.source_jid, msg.tstamp)
 
 
     def sendPresence(self, pfrom, pto):
