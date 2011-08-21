@@ -4,15 +4,41 @@ from twisted.internet import defer, reactor
 from twisted.python import log
 from twisted.web import client
 
-from campfirer.DOMLight import createModel
+from campfirer.DOMLight import createModel, XMLMaker
 
 
 class Message:
-    def __init__(self, user, body, msgtype, tstamp):
+    def __init__(self, id, user, body, msgtype, tstamp):
+        self.id = id
         self.user = user
         self.body = body
         self.msgtype = msgtype
         self.tstamp = tstamp
+
+
+class ParticipantList:
+    def __init__(self):
+        self.participants = {}
+        self.recent = {}
+
+    def add(self, id, name):
+        self.participants[id] = name
+
+    def update(self, newpeople):
+        self.recent = {}
+        for uid, name in newpeople.items():
+            if not self.participants.has_key(uid):
+                self.recent[uid] = name
+                self.participants[uid] = name
+
+    def getName(self, id):
+        return self.participants.get(id, id)
+
+    def getJustJoined(self):
+        return self.recent
+
+    def __len__(self):
+        return len(self.participants)
         
 
 class MessageList:
@@ -20,12 +46,29 @@ class MessageList:
         self.maxsize = maxsize
         self.msgs = []
         self.last_msg_id = None
+        self.ignore = set()
+
+
+    def addIgnore(self, id):
+        self.ignore.add(id)
+
 
     def append(self, msgs):
         self.msgs = (self.msgs + msgs)[-self.maxsize:]
 
+
+    def reset(self, msgs):
+        self.msgs = []
+        for msg in msgs:
+            if msg.id in self.ignore:
+                self.ignore.discard(msg.id)
+            else:
+                self.msgs.append(msg)
+
+
     def __iter__(self):
         return self.msgs.__iter__()
+
 
     def __len__(self):
         return len(self.msgs)
@@ -52,11 +95,13 @@ class CampfireClient:
         return client.getPage(self.url(url), headers=headers)    
 
 
-    def postPage(self, url):
+    def postPage(self, url, data=None):
         log.msg("POST %s" % url)
         auth = "%s:X" % self.token
         headers = {'Authorization': base64.b64encode(auth) }
-        return client.getPage(self.url(url), method='POST', headers=headers)    
+        if data is not None:
+            headers['Content-Type'] = 'application/xml'
+        return client.getPage(self.url(url), method='POST', headers=headers, postdata=data)    
     
 
 class CampfireRoom(CampfireClient):
@@ -65,7 +110,7 @@ class CampfireRoom(CampfireClient):
         self.roomname = roomname
         self.room_id = room_id
         self.token = token
-        self.participants = {}
+        self.participants = ParticipantList()
         self.topic = ""
         self.msgs = MessageList()
         self.muc = muc
@@ -82,10 +127,15 @@ class CampfireRoom(CampfireClient):
 
     def _updateRoom(self, response):
         root = createModel(response)
-        self.participants = {}
+
+        # update list of participants
+        participants = {}
         for xmluser in root.users[0].user:
             uid = xmluser.id[0].text[0]
-            self.participants[uid] = xmluser.name[0].text[0]
+            name = xmluser.name[0].text[0]
+            participants[uid] = name
+        self.participants.update(participants)
+        
         self.topic = root.topic[0].text[0]
         if self.msgs.last_msg_id is not None:
             url = "room/%s/recent.xml?since_message_id=%s" % (self.room_id, self.msgs.last_msg_id)
@@ -100,14 +150,25 @@ class CampfireRoom(CampfireClient):
         for xmlmsg in root.message:
             msgtype = xmlmsg.type[0].text[0]
             if msgtype in ["TextMessage", "PasteMessage"]:
-                user = self.participants.get(xmlmsg.children['user-id'][0].text[0], xmlmsg.children['user-id'][0].text[0])
+                user = self.participants.getName(xmlmsg.children['user-id'][0].text[0])
                 body = xmlmsg.body[0].text[0]
+                id = xmlmsg.id[0].text[0]
                 tstamp = xmlmsg.children["created-at"][0].text[0]
-                msgs.append(Message(user, body, msgtype, tstamp))
+                msgs.append(Message(id, user, body, msgtype, tstamp))
             self.msgs.last_msg_id = xmlmsg.children['id'][0].text[0]
-        self.msgs.append(msgs)
+        self.msgs.reset(msgs)
         return self
 
+
+    def say(self, msg):
+        xml = XMLMaker()
+        xmlmsg = xml.message({}, xml.body({}, msg))
+        # ignore this message next time we poll campfirenow.com
+        def addIgnore(result):
+            root = createModel(result)
+            self.msgs.addIgnore(root.id[0].text[0])
+        return self.postPage("room/%s/speak.xml" % self.room_id, data=str(xmlmsg)).addCallback(addIgnore)
+        
 
     def join(self):
         return self.postPage("room/%s/join.xml" % self.room_id).addCallback(lambda _: self)
@@ -208,15 +269,15 @@ class SmokeyTheBear:
         return "%s@%s" % (user, account)        
 
 
-    def getCampfire(self, account, user, password):
-        key = self.key(account, user)
+    def getCampfire(self, account, jid, password=None):
+        key = self.key(account, jid.userhost())
         if self.fires.has_key(key):
             return defer.succeed(self.fires[key])
         def save(result):
             if result is not None:
                 self.fires[key] = result
             return result
-        return Campfire(account, self.muc).initialize(user, password).addCallback(save)
+        return Campfire(account, self.muc).initialize(jid.resource, password).addCallback(save)
 
 
     def putCampfireOut(self, account, user):

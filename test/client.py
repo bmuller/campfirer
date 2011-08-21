@@ -4,7 +4,9 @@ from twisted.words.protocols.jabber import xmlstream
 from twisted.names.srvconnect import SRVConnector
 from twisted.internet import reactor
 from twisted.python import log
+
 import sys
+import time
 
 from config import CONFIG
 
@@ -67,7 +69,17 @@ class Client(object):
         x = presence.addElement('x', 'http://jabber.org/protocol/muc')
         x.addElement('password', content=CONFIG['roompasswd'])
         xs.send(presence)
+        reactor.callLater(10, self.say, "hello there %i" % time.time())
 
+
+    def say(self, msgtxt):
+        msg = domish.Element((None, 'message'))
+        msg['from'] = CONFIG['jid']
+        msg['to'] = jid.JID(CONFIG['room']).userhost()
+        msg['type'] = "groupchat"
+        msg.addElement('body', content=msgtxt)
+        self.xmlstream.send(msg)
+        
 
     def init_failed(self, failure):
         log.err("Initialization failed.")

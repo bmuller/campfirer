@@ -52,6 +52,7 @@ class MUCService(component.Service):
         self.xmlstream = xmlstream
         self.xmlstream.addObserver(DISCO_INFO, self.onDiscoInfo)
         self.xmlstream.addObserver(PRESENCE, self.onPresence)
+        self.xmlstream.addObserver(MESSAGE, self.onMessage)
         log.msg("muc component connected")
         
 
@@ -66,13 +67,18 @@ class MUCService(component.Service):
             response.send(iq['from'])
 
 
+    def parseCampfireName(self, jid):
+        room_parts = jid.user.split(".")
+        roomname = ".".join(room_parts[1:])
+        account = room_parts[0]    
+        return (account, roomname)
+        
+
     # <presence from='bmuller@butterfat.net/hm-min' to='testthree@muc.campfirer.com/bmuller'>
     #   <x xmlns='http://jabber.org/protocol/muc'><password>password</password></x></presence>
     def onPresence(self, pres):
         to = jid.JID(pres['to'])
-        room_parts = to.user.split(".")
-        roomname = ".".join(room_parts[1:])
-        account = room_parts[0]    
+        account, roomname = self.parseCampfireName(to)
 
         def handleAuth(campfire):
             if campfire is None:
@@ -87,7 +93,7 @@ class MUCService(component.Service):
             self.sendErrorPresence(pres, "not-authorized")
         else:
             log.msg("attempting to auth %s for room %s on account %s" % (to.resource, roomname, account))
-            self.smokey.getCampfire(account, to.resource, password).addCallback(handleAuth)
+            self.smokey.getCampfire(account, to, password).addCallback(handleAuth)
 
     
     def initializeRoom(self, campfire, roomname, participant_jid, source_jid):
@@ -101,7 +107,7 @@ class MUCService(component.Service):
 
 
     def handleRoomUpdate(self, room):
-        for username in room.participants.values():
+        for username in room.participants.getJustJoined().values():
             mfrom = room.participant_jid.userhostJID()  
             mfrom.resource = username.replace(" ", "")
             self.sendPresence(mfrom, room.source_jid)
@@ -139,45 +145,13 @@ class MUCService(component.Service):
         self.xmlstream.send(m)
 
 
-    ##################    ##################    ##################    ##################    ##################
-    def presence(self, sendto):
-        p = domish.Element((None, 'presence'))
-        p['to'] = sendto
-        p['from'] = self.jid
-        return p
-
-    
-    def updateRoomList(self, roomlist):
-        rooms = []
-        for room in roomlist.firstChildElement().elements():
-            rooms.append((room['jid'], room['name']))
-
-        def setID(room):
-            self.rooms[unicode(room.jid)] = (room.id, room.name)
-
-        def addRooms(r):
-            room = r.pop()
-            d = Room.createIfNonexistant(room[0], room[1]).addCallback(setID)
-            if len(r) > 0:
-                return d.addCallback(lambda _: addRooms(r))
-            return d
-
-        addRooms(rooms).addCallback(lambda _: self.joinRooms())
-
-
-    def joinRooms(self):
-        for jid in self.rooms.keys():
-            if len(self.config['rooms']) == 0 or self.config['rooms'].has_key(jid):
-                p = self.presence("%s/%s" % (jid, 'gossipr'))
-                p.addElement('x', 'http://jabber.org/protocol/muc')
-                self.xmlstream.send(p)
-
-
     def onMessage(self, msg):
-        jidparts = jid.parse(msg['from'])
-        userhost = "%s@%s" % (jidparts[0], jidparts[1])
-        
-        if self.rooms.has_key(userhost):
-            room_id = self.rooms[userhost][0]
-            body = xpath.queryForString("/message/body", msg)
-            return Message(speaker=jidparts[2], message=body, room_id=room_id, created_at=datetime.datetime.now()).save()
+        to = jid.JID(msg['to'])
+        account, roomname = self.parseCampfireName(to)
+        def sendMsgRoom(room):
+            if room is not None:
+                room.say(xpath.queryForString("/message/body", msg))
+        def sendMsg(campfire):
+            if campfire is not None:
+                campfire.getRoom(roomname).addCallback(sendMsgRoom)
+        self.smokey.getCampfire(account, to).addCallback(sendMsg)
