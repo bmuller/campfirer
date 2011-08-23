@@ -1,3 +1,0 @@
-messagelist now contains all last 100 messages.  when muc.handleRoomUpdate is called, all 100 are reprocessed each time.
-
-There should be the concept of "last_added" or something like that
