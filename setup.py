@@ -10,8 +10,8 @@ setup(
     description="Jabber MUC interface to campfire rooms",
     author="Brian Muller",
     author_email="bamuller@gmail.com",
-    license="GPLv3",
-    url="https://github.com/bmuller/campfirer",
+    license="MIT",
+    url="http://findingscience.com/campfirer",
     packages=["campfirer"],
-    requires=["twisted.enterprise.adbapi", "twisted.words", "twistar"]
+    requires=["twisted.enterprise.adbapi", "twisted.words"]
 )
