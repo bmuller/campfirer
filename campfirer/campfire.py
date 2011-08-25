@@ -50,7 +50,9 @@ class MessageList:
 
 
     def addIgnore(self, id):
-        self.ignore.add(id)
+        # ignore ignoring now - I think double printing was caused by a bug in my XMPP muc implementation
+        #self.ignore.add(id)
+        return
 
 
     def append(self, msgs):
@@ -105,7 +107,7 @@ class CampfireClient:
     
 
 class CampfireRoom(CampfireClient):
-    def __init__(self, account, token, roomname, room_id, muc):
+    def __init__(self, account, token, roomname, room_id, muc, campfire_name):
         CampfireClient.__init__(self, account)
         self.roomname = roomname
         self.room_id = room_id
@@ -114,6 +116,8 @@ class CampfireRoom(CampfireClient):
         self.topic = ""
         self.msgs = MessageList()
         self.muc = muc
+        # name of campfire user
+        self.campfire_name = campfire_name
         # the jid of the user who has connected
         self.source_jid = None
         # the jid of the use in the room
@@ -199,6 +203,8 @@ class Campfire(CampfireClient):
         self.rooms = {}
         self.username = None
         self.muc = muc
+        # name of campfire user
+        self.campfire_name = None
 
 
     def updateRooms(self):
@@ -226,7 +232,7 @@ class Campfire(CampfireClient):
                     break
             if room_id is None:
                 return None
-            room = CampfireRoom(self.account, self.token, name, room_id, self.muc)
+            room = CampfireRoom(self.account, self.token, name, room_id, self.muc, self.campfire_name)
             return room.join().addCallback(lambda s: s.update()).addCallback(_saveHandle)
         return self.getPage("rooms.xml").addCallback(_getRoomID)
 
@@ -246,6 +252,7 @@ class Campfire(CampfireClient):
         def _getToken(response):
             root = createModel(response)
             self.token = root.children["api-auth-token"][0].text[0]
+            self.campfire_name = root.name[0].text[0]
             log.msg("Successfully authenticated %s with token %s" % (username, self.token))            
             return self
 
@@ -280,9 +287,9 @@ class SmokeyTheBear:
         return Campfire(account, self.muc).initialize(jid.resource, password).addCallback(save)
 
 
-    def putCampfireOut(self, account, user):
-        log.msg("Putting campfire %s @ %s out" % (user, account))
-        key = self.key(account, user)
+    def putCampfireOut(self, account, jid):
+        log.msg("Putting campfire %s @ %s out" % (jid.userhost(), account))
+        key = self.key(account, jid.userhost())
         def deleteFire(result):
             del self.fires[key]            
         if self.fires.has_key(key):

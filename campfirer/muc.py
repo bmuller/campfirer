@@ -88,7 +88,7 @@ class MUCService(component.Service):
 
         password = xpath.queryForString("/presence/x/password", pres)
         if pres.getAttribute('type') == "unavailable":
-            self.smokey.putCampfireOut(account, to.resource)
+            self.smokey.putCampfireOut(account, to)
         elif password == "":
             self.sendErrorPresence(pres, "not-authorized")
         else:
@@ -108,9 +108,14 @@ class MUCService(component.Service):
 
     def handleRoomUpdate(self, room):
         for username in room.participants.getJustJoined().values():
-            mfrom = room.participant_jid.userhostJID()  
+            mfrom = room.participant_jid.userhostJID()               
             mfrom.resource = username.replace(" ", "")
-            self.sendPresence(mfrom, room.source_jid)
+            if username == room.campfire_name:
+                # if sending presence to same user that is logged in, send status codes 110 and 210
+                # per example 21 in section 7.1.3 of XEP 0045
+                self.sendPresence(mfrom, room.source_jid, statuses=['110', '210'])
+            else:
+                self.sendPresence(mfrom, room.source_jid)
                 
         for msg in room.msgs:
             mfrom = room.participant_jid.userhostJID()
@@ -118,11 +123,15 @@ class MUCService(component.Service):
             self.sendMessage(mfrom, msg.body, room.source_jid, msg.tstamp)
 
 
-    def sendPresence(self, pfrom, pto):
+    def sendPresence(self, pfrom, pto, statuses=None):
         log.msg("sending presence from %s to %s" % (pfrom, pto))
+        statuses = statuses or []
+        
         p = domish.Element((None, 'presence'), attribs = {'from': pfrom.full(), 'to': pto.full()})
         x = p.addElement('x', NS_MUC_USER)
         x.addChild(domish.Element((None, 'item'), attribs = {'affiliation': 'member', 'role': 'participant'}))
+        for status in statuses:
+            x.addChild(domish.Element((None, 'status'), attribs = {'code': status}))            
         self.xmlstream.send(p)
 
 
@@ -136,9 +145,9 @@ class MUCService(component.Service):
         self.xmlstream.send(p)
 
 
-    def sendMessage(self, mfrom, msgBody, mto, tstamp):
+    def sendMessage(self, mfrom, msgBody, mto, tstamp, type="groupchat"):
         log.msg("sending message from %s to %s" % (mfrom, mto))
-        m = domish.Element((None, 'message'), attribs = {'from': mfrom.full(), 'to': mto.full(), 'type': 'groupchat'})
+        m = domish.Element((None, 'message'), attribs = {'from': mfrom.full(), 'to': mto.full(), 'type': type})
         m.addElement('body', content=msgBody)
         delay = domish.Element((DELAY_NS, 'delay'), attribs = {'from': mfrom.userhost(), 'stamp': tstamp})
         m.addChild(delay)
@@ -146,6 +155,10 @@ class MUCService(component.Service):
 
 
     def onMessage(self, msg):
+        if msg['type'] != "groupchat":
+            m = domish.Element((None, 'message'), attribs = {'from': msg['to'], 'to': msg['from'], 'type': 'chat'})
+            m.addElement('body', content="You cannot send messages directly to users.")
+            self.xmlstream.send(m)
         to = jid.JID(msg['to'])
         account, roomname = self.parseCampfireName(to)
         def sendMsgRoom(room):

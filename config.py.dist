@@ -3,5 +3,6 @@ CONFIG = {
     'xmpp.port': 5554,
     'xmpp.muc.password': 'secret',
     'xmpp.muc.host': 'muc.localhost',
-    'campfire.update.interval': 5
+    'campfire.update.interval': 5,
+    #'campfire.logdir': './logs' # uncomment this line to log to dir and have logs daily rotated
     }
