@@ -29,9 +29,70 @@
       </div>
     </div>
     <div id="content">
-      <h1 id='campfirer_xmpp__campfire'>Campfirer: XMPP &lt;-&gt; Campfire</h1>
+      <h1 id='campfire_a_jabber__campfire_gateway'>Campfire: A Jabber / Campfire Gateway</h1>
 
-<p>Campfirer provides a way of connecting to <a href='http://campfirenow.com'>campfire</a> via the <a href='http://xmpp.org'>XMPP (Jabber) protocol</a>.</p>
+<p>Campfirer gives <a href='http://campfirenow.com'>campfire</a> users a way to connect to rooms using any <a href='http://xmpp.org'>Jabber (XMPP)</a> client. It does this by implementing (a portion) of <a href='http://xmpp.org/extensions/xep-0045.html'>the multi-user chat extension</a>. Note that you must first have an account at <a href='http://campfirenow.com'>campfirenow.com</a> and have created a room there before you can use campfirer to connect.</p>
+
+<p>There are two ways you can use the campfirer gateway:</p>
+
+<ol>
+<li>You can use the gateway running at <strong>campfirer.com</strong> to connect to any campfire room.</li>
+
+<li>You can run a Jabber server at your own domain and run campfirer as a <a href='http://xmpp.org/extensions/xep-0114.html'>component</a>.</li>
+</ol>
+
+<p>The first option is the easiest to try things out - but there is no guarantee of service quality or uptime.</p>
+
+<h2 id='1_connecting_to_campfirercom'>1. Connecting to Campfirer.com</h2>
+
+<p>There are three pieces of information you&#8217;ll need first:</p>
+
+<ol>
+<li>Your account name. This is the <strong>name</strong> portion of your login url of https://<strong>name</strong>.campfirenow.com</li>
+
+<li>The name of the room you want to connect to</li>
+
+<li>Your username / password that you use at https://name.campfirenow.com to log in</li>
+</ol>
+
+<p>To connect, start your Jabber client and choose the option to join a new group chat.</p>
+
+<ul>
+<li>Your nickname (or username) should be your username for campfirenow.com.</li>
+
+<li>Your password is the password you use to log into campfirenow.com.</li>
+
+<li>The name of the room you should use is is your acount name followed by a &#8221;.&#8221; followed by the name of the room. For instance, if your account name is <em>mycompany</em> and your room name is <em>tech</em>, you should tell your Jabber client you want to connect to &#8220;mycompany.tech&#8221;.</li>
+
+<li>The name of the server is <em>muc.campfirer.com</em>.</li>
+</ul>
+
+<p>If your client merely asks for the room (without a separate server entry box), use &#8220;mycompany.tech@muc.campfirer.com&#8221;.</p>
+
+<h2 id='2_running_campfirer_yourself'>2. Running Campfirer Yourself</h2>
+<div class='highlight'><pre><code class='erlang'><span class='c'>%%%   ===============</span>
+<span class='c'>%%%   LISTENING PORTS</span>
+
+<span class='c'>%%</span>
+<span class='c'>%% listen: Which ports will ejabberd listen, which service handles it</span>
+<span class='c'>%% and what options to start it with.</span>
+<span class='c'>%%</span>
+<span class='p'>{</span><span class='n'>listen</span><span class='p'>,</span>
+ <span class='p'>[</span>
+
+<span class='c'>%% ...</span>
+
+  <span class='p'>{</span><span class='mi'>5554</span><span class='p'>,</span> <span class='n'>ejabberd_service</span><span class='p'>,</span> <span class='p'>[</span>
+                            <span class='p'>{</span><span class='n'>ip</span><span class='p'>,</span> <span class='p'>{</span><span class='mi'>127</span><span class='p'>,</span> <span class='mi'>0</span><span class='p'>,</span> <span class='mi'>0</span><span class='p'>,</span> <span class='mi'>1</span><span class='p'>}},</span>
+                            <span class='p'>{</span><span class='n'>access</span><span class='p'>,</span> <span class='n'>all</span><span class='p'>},</span>
+                            <span class='p'>{</span><span class='n'>shaper_rule</span><span class='p'>,</span> <span class='n'>fast</span><span class='p'>},</span>
+                            <span class='p'>{</span><span class='n'>host</span><span class='p'>,</span> <span class='s'>&quot;muc.campfirer.com&quot;</span><span class='p'>,</span> <span class='p'>[{</span><span class='n'>password</span><span class='p'>,</span> <span class='s'>&quot;secretpassword&quot;</span><span class='p'>}]}</span>
+                            <span class='p'>]},</span>
+<span class='c'>%% ...</span>
+</code></pre>
+</div><div class='highlight'><pre><code class='bash'>git://github.com/bmuller/campfirer.git
+</code></pre>
+</div>
     </div>
     <div id="footer"></div>
   </body>
