@@ -26,7 +26,7 @@ To connect, start your Jabber client and choose the option to join a new group c
 * The name of the room you should use is is your acount name followed by a "." followed by the name of the room.  For instance, if your account name is *mycompany* and your room name is *tech*, you should tell your Jabber client you want to connect to "mycompany.tech".
 * The name of the server is *muc.campfirer.com*.
 
-If your client merely asks for the room (without a separate server entry box), use "mycompany.tech@muc.campfirer.com".
+If your client merely asks for the room (without a separate box for the server name), use "mycompany.tech@muc.campfirer.com".  That's it.
 
 ## 2. Running Campfirer Yourself
 
