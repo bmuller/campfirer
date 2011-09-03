@@ -93,8 +93,8 @@ text-decoration: none;
 h1 { font-size: 1.3em; }
 h1, h2 { font-family: sans-serif; color: #0785C9; }
 h2 {
-font-size: 0.8em;
-color: #333;
+font-size: 1em;
+color: #000;
 text-decoration: underline;
 margin-top: 25px;
 }

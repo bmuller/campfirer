@@ -25,6 +25,7 @@
       <div id="menu">
 	<ul>
 	  <li><a href="index.html">home</a></li>
+	  <li><a href="component.html">component</a></li>
 	  <li><a href="http://github.com/bmuller/campfirer/issues">issues</a></li>
 	</ul>
       </div>
@@ -37,14 +38,14 @@
 <p>There are two ways you can use the campfirer gateway:</p>
 
 <ol>
-<li>You can use the gateway running at <strong>campfirer.com</strong> to connect to any campfire room.</li>
+<li>You can use the gateway running at <strong>campfirer.com</strong> to connect to any campfire room. See the instructions below.</li>
 
-<li>You can run a Jabber server at your own domain and run campfirer as a <a href='http://xmpp.org/extensions/xep-0114.html'>component</a>.</li>
+<li>You can run a Jabber server at your own domain and run campfirer as an <a href='http://xmpp.org/extensions/xep-0114.html'>XMPP component</a>. See the <a href='component.html'>component</a> page for directions.</li>
 </ol>
 
 <p>The first option is the easiest to try things out - but there is no guarantee of service quality or uptime.</p>
 
-<h2 id='1_connecting_to_campfirercom'>1. Connecting to Campfirer.com</h2>
+<h2 id='connecting_to_campfirercom'>Connecting to Campfirer.com</h2>
 
 <p>There are three pieces of information you&#8217;ll need first:</p>
 
@@ -69,31 +70,6 @@
 </ul>
 
 <p>If your client merely asks for the room (without a separate box for the server name), use &#8220;mycompany.tech@muc.campfirer.com&#8221;. That&#8217;s it.</p>
-
-<h2 id='2_running_campfirer_yourself'>2. Running Campfirer Yourself</h2>
-<div class='highlight'><pre><code class='erlang'><span class='c'>%%%   ===============</span>
-<span class='c'>%%%   LISTENING PORTS</span>
-
-<span class='c'>%%</span>
-<span class='c'>%% listen: Which ports will ejabberd listen, which service handles it</span>
-<span class='c'>%% and what options to start it with.</span>
-<span class='c'>%%</span>
-<span class='p'>{</span><span class='n'>listen</span><span class='p'>,</span>
- <span class='p'>[</span>
-
-<span class='c'>%% ...</span>
-
-  <span class='p'>{</span><span class='mi'>5554</span><span class='p'>,</span> <span class='n'>ejabberd_service</span><span class='p'>,</span> <span class='p'>[</span>
-                            <span class='p'>{</span><span class='n'>ip</span><span class='p'>,</span> <span class='p'>{</span><span class='mi'>127</span><span class='p'>,</span> <span class='mi'>0</span><span class='p'>,</span> <span class='mi'>0</span><span class='p'>,</span> <span class='mi'>1</span><span class='p'>}},</span>
-                            <span class='p'>{</span><span class='n'>access</span><span class='p'>,</span> <span class='n'>all</span><span class='p'>},</span>
-                            <span class='p'>{</span><span class='n'>shaper_rule</span><span class='p'>,</span> <span class='n'>fast</span><span class='p'>},</span>
-                            <span class='p'>{</span><span class='n'>host</span><span class='p'>,</span> <span class='s'>&quot;muc.campfirer.com&quot;</span><span class='p'>,</span> <span class='p'>[{</span><span class='n'>password</span><span class='p'>,</span> <span class='s'>&quot;secretpassword&quot;</span><span class='p'>}]}</span>
-                            <span class='p'>]},</span>
-<span class='c'>%% ...</span>
-</code></pre>
-</div><div class='highlight'><pre><code class='bash'>git://github.com/bmuller/campfirer.git
-</code></pre>
-</div>
     </div>
     <div id="footer"></div>
   </body>
