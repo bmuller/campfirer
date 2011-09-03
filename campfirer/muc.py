@@ -13,7 +13,7 @@ from twisted.words.protocols.jabber import component
 from zope.interface import Interface, implements
 
 from campfirer.xmpp import *
-from campfirer.campfire import *
+from campfirer.campfirenow.smokey import SmokeyTheBear
 
 class LogService(component.Service):
     def transportConnected(self, xmlstream):
@@ -78,6 +78,7 @@ class MUCService(component.Service):
     #   <x xmlns='http://jabber.org/protocol/muc'><password>password</password></x></presence>
     def onPresence(self, pres):
         to = jid.JID(pres['to'])
+        fr = jid.JID(pres['from'])
         account, roomname = self.parseCampfireName(to)
 
         def handleAuth(campfire):
@@ -93,7 +94,7 @@ class MUCService(component.Service):
             self.sendErrorPresence(pres, "not-authorized")
         else:
             log.msg("attempting to auth %s for room %s on account %s" % (to.resource, roomname, account))
-            self.smokey.getCampfire(account, to, password).addCallback(handleAuth)
+            self.smokey.initCampfire(account, fr, to, password).addCallback(handleAuth)
 
     
     def initializeRoom(self, campfire, roomname, participant_jid, source_jid):
@@ -160,6 +161,7 @@ class MUCService(component.Service):
             m.addElement('body', content="You cannot send messages directly to users.")
             self.xmlstream.send(m)
         to = jid.JID(msg['to'])
+        fr = jid.JID(msg['from'])
         account, roomname = self.parseCampfireName(to)
         def sendMsgRoom(room):
             if room is not None:
@@ -167,4 +169,4 @@ class MUCService(component.Service):
         def sendMsg(campfire):
             if campfire is not None:
                 campfire.getRoom(roomname).addCallback(sendMsgRoom)
-        self.smokey.getCampfire(account, to).addCallback(sendMsg)
+        self.smokey.getCampfire(account, fr).addCallback(sendMsg)
