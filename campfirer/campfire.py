@@ -277,7 +277,7 @@ class SmokeyTheBear:
 
 
     def getCampfire(self, account, jid, password=None):
-        key = self.key(account, jid.userhost())
+        key = self.key(account, jid.resource)
         if self.fires.has_key(key):
             return defer.succeed(self.fires[key])
         def save(result):
@@ -288,13 +288,16 @@ class SmokeyTheBear:
 
 
     def putCampfireOut(self, account, jid):
-        log.msg("Putting campfire %s @ %s out" % (jid.userhost(), account))
-        key = self.key(account, jid.userhost())
-        def deleteFire(result):
-            del self.fires[key]            
-        if self.fires.has_key(key):
-            self.fires[key].leaveRooms().addCallback(deleteFire)
-            
+        def deleteFire(_, key):
+            del self.fires[key]
+        
+        campfire_name = jid.resource
+        for key, fire in self.fires.items():
+            fires_campfire_name = fire.campfire_name.replace(" ", "")
+            if fires_campfire_name == campfire_name and account == fire.account:
+                log.msg("Putting campfire %s @ %s out" % (jid.resource, account))
+                fire.leaveRooms().addCallback(deleteFire, key)
+                
             
     def startFireDuty(self, seconds):
         self.checkFires()
