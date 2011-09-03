@@ -1,8 +1,8 @@
 ---
 layout: base
-title: "Campfire: A Jabber / Campfire Gateway"
+title: "Campfirer: A Jabber / Campfire Gateway"
 ---
-# Campfire: A Jabber / Campfire Gateway
+# Campfirer: A Jabber / Campfire Gateway
 Campfirer gives [campfire](http://campfirenow.com) users a way to connect to rooms using any [Jabber (XMPP)](http://xmpp.org) client.  It does this by implementing (a portion) of [the multi-user chat extension](http://xmpp.org/extensions/xep-0045.html).  Note that you must first have an account at [campfirenow.com](http://campfirenow.com) and have created a room there before you can use campfirer to connect.
 
 There are two ways you can use the campfirer gateway:
