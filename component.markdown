@@ -29,6 +29,8 @@ First, set up your jabber server to accept a new component.  For instance, for [
 
 Make sure to set a more secret password, change the domain to your jabber server's domain, and restart your server.  The muc domain name should be set up in your DNS records to be a **CNAME** for yourdomain.com and should resolve before continuing.
 
+Next, install the [twisted framework](http://twistedmatrix.com).  Twisted allows campfirer to handle many connections at once in an asynchronous manner.
+
 Then, checkout campfirer:
 
 {% highlight bash %}
