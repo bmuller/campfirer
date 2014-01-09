@@ -31,6 +31,7 @@ class MUCService(component.Service):
     implements(IService)
 
     def __init__(self, config):
+        self.last_topic = None
         self.config = config
         self.rooms = {}
         self.host = self.config['xmpp.muc.host']
@@ -122,6 +123,12 @@ class MUCService(component.Service):
             mfrom = room.participant_jid.userhostJID()
             mfrom.resource = msg.user.replace(" ", "") 
             self.sendMessage(mfrom, msg.body, room.source_jid, msg.tstamp)
+
+        if room.topic != self.last_topic:
+            self.last_topic = room.topic
+            topic = domish.Element((None, 'message'), attribs = {'from': room.participant_jid.userhost(), 'to': room.source_jid.full(), 'type': 'groupchat'})
+            topic.addElement('subject', content=room.topic)
+            self.xmlstream.send(topic)
 
 
     def sendPresence(self, pfrom, pto, statuses=None):

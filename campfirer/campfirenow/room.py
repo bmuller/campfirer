@@ -40,8 +40,12 @@ class CampfireRoom(CampfireClient):
             name = xmluser.name[0].text[0]
             participants[uid] = name
         self.participants.update(participants)
-        
-        self.topic = root.topic[0].text[0]
+
+        first_topic = root.topic[0]
+        try:
+            self.topic = first_topic.text[0]
+        except:
+            self.topic = ''
         if self.msgs.last_msg_id is not None:
             url = "room/%s/recent.xml?since_message_id=%s" % (self.room_id, self.msgs.last_msg_id)
         else:
